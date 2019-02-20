@@ -1,6 +1,6 @@
 import Macro._
 
-object Test {
+object Test2 {
   def main(args: Array[String]): Unit = {
     val w = "world"
     println(s2"Hello $w!")

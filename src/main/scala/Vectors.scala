@@ -12,29 +12,29 @@ object Vectors {
    *  Or throws an exception if v1.length != v2.length
    *  Both arrays are assumed to be immutable.
    */
-  inline def dot(v1: => Array[Int], v2: => Array[Int]): Int = ~dotImpl('(v1), '(v2))(Tasty.macroContext)
+  inline def dot(v1: => Array[Int], v2: => Array[Int]): Int = ~dotImpl('(v1), '(v2))(Reflection.macroContext)
   
   /** Generates code to compute the dot product.
    *  Will try to partially evaluate any statically available data.
    */
-  def dotImpl(v1: Expr[Array[Int]], v2: Expr[Array[Int]])(reflect: Tasty): Expr[Int] = {
+  def dotImpl(v1: Expr[Array[Int]], v2: Expr[Array[Int]])(reflect: Reflection): Expr[Int] = {
     import reflect._
 
     object EmptyArray {
       def unapply(arg: Tree): Boolean = arg match {
-        case Term.Apply(Term.Apply(Term.TypeApply(Term.Select(Term.Ident("Array"), "apply", _), List(TypeTree.Synthetic())), List(Term.Typed(Term.Repeated(Nil), TypeTree.Synthetic()))), _) => true
+        case Term.Apply(Term.Apply(Term.TypeApply(Term.Select(Term.Ident("Array"), "apply"), List(TypeTree.Inferred())), List(Term.Typed(Term.Repeated(Nil, _), TypeTree.Inferred()))), _) => true
         case _ => false
       }
     }
 
     // Useful methods
     // Use i.toExpr to lift an i:Int into an quoted.Expr[Int]
-    // Use q.toTasty to transform a q:quoted.Expr[_] to a Tasty.Tree
-    // Use tree.toExpr[Int] to transform a tree:Tasty.Tree to a quoted.Expr[Int]
+    // Use q.unseal to transform a q:quoted.Expr[_] to a Reflection.Tree
+    // Use tree.seal[Int] to transform a tree:Reflection.Tree to a quoted.Expr[Int]
     // Use q.show to show the code of a q:quoted.Expr[_]
-    // Use tree.show to show the extractors needed to pattern match a tree:Tasty.Tree
+    // Use tree.show to show the extractors needed to pattern match a tree:Reflection.Tree
 
-    val generatedCode = (v1.toTasty.underlyingArgument, v2.toTasty.underlyingArgument) match {
+    val generatedCode = (v1.unseal.underlyingArgument, v2.unseal.underlyingArgument) match {
       case (EmptyArray(), EmptyArray()) => '(0)
       // TODO Exercise: optimize more cases
       // case (EmptyArray(), _) => '()
