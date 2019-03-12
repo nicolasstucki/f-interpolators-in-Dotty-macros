@@ -76,7 +76,7 @@
 //   f2"$s%#s"
 
 //   // 7) misunderstood conversions
-//   f2"$t%tG"
+//   f2"$t%tG" 
 //   f2"$t%t"
 //   f2"$s%10.5"
 

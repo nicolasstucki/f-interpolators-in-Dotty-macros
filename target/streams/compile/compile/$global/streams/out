@@ -1,5 +1,29 @@
-[0m[[0m[31merror[0m] [0m[0m[34m-- [E040] Syntax Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:87:16 [0m[0m
-[0m[[0m[31merror[0m] [0m[0m[31m87 |[0m                [33mthrow[0m [33mnew[0m [35mTastyTypecheckError[0m([31m"type mismatch;\n found : "[0m + arg.tpe.show + [31m"\nrequired : Char\n"[0m) [34m//TODO : position[0m[0m
-[0m[[0m[31merror[0m] [0m[0m   |                [31m^^^^^[0m[0m
-[0m[[0m[31merror[0m] [0m[0m   |                [31m'=>[0m' expected, but [31m'throw[0m' found[0m
-[0m[[0m[31merror[0m] [0m[0mone error found[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:151:2 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m151 |[0m  [34m/**[0m
+[0m[[0m[31merror[0m] [0m[0m    |  [31m^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m    |  unclosed comment[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- [E040] Syntax Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:279:0 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m279 |[0m[0m
+[0m[[0m[31merror[0m] [0m[0m    |[31m^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m    |[31m'}'[0m expected, but eof found[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- [E006] Unbound Identifier Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:16:28 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m16 |[0m[33mobject[0m [35mFIntepolator[0m [33mextends[0m [35mMacroStringInterpolator[String][0m {[0m
+[0m[[0m[31merror[0m] [0m[0m   |                            [31m^^^^^^^^^^^^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m   |                            Not found: type MacroStringInterpolator[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- [E050] Reference Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:11:42 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m11 |[0m    [33minline[0m [33mdef[0m [36mf2[0m([36margs[0m: [35mAny[0m*): [35mString[0m = ${FIntepolator([31m'strCtx[0m, [31m'args[0m)}[0m
+[0m[[0m[31merror[0m] [0m[0m   |                                          [31m^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m   |                            [33mobject[0m [35mFIntepolator[0m does not take parameters[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- [E006] Unbound Identifier Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:129:0 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m129 |[0m<<<<<<< HEAD[0m
+[0m[[0m[31merror[0m] [0m[0m    |[31m^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m    |Not found: <<<<<<<[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- [E006] Unbound Identifier Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:147:18 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m147 |[0m        [33mthrow[0m [33mnew[0m [35mNotStaticlyKnownError[0m([31m"Expected statically known StringContext"[0m, tree.seal[[35mAny[0m])[0m
+[0m[[0m[31merror[0m] [0m[0m    |                  [31m^^^^^^^^^^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m    |                  Not found: type NotStaticlyKnownError[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:147:40 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m147 |[0m        [33mthrow[0m [33mnew[0m [35mNotStaticlyKnownError[0m([31m"Expected statically known StringContext"[0m, tree.seal[[35mAny[0m])[0m
+[0m[[0m[31merror[0m] [0m[0m    |                                        [31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m    |                 too many arguments for constructor Object: (): Object[0m
+[0m[[0m[31merror[0m] [0m[0m7 errors found[0m

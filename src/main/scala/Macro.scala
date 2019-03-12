@@ -1,4 +1,3 @@
-
 import scala.quoted._
 import scala.tasty.Reflection
 import scala.language.implicitConversions
@@ -8,14 +7,23 @@ import scala.quoted.Toolbox.Default._
 object Macro {
 
   class StringContextOps(strCtx: => StringContext) {
-    inline def f2(args: Any*): String = ~FIntepolator('(strCtx), '(args))
+    inline def f2(args: Any*): String = ${FIntepolator('strCtx, 'args)}
   }
   implicit inline def SCOps(strCtx: => StringContext): StringContextOps = new StringContextOps(strCtx)
 }
 
 object FIntepolator extends MacroStringInterpolator[String] {
   
-  override protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] = {
+  override protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] = { 
+  //TODO : should switch to other version -- interpolate(strCtx: Expr[StringContext], args: List[Expr[Any]])  
+  // use upper ones and then gets the real elements afterwards
+  // unseal expr and get pos in list of expr  
+
+  //TODO : start to throw error and use warnings 
+  // - same line, show only one - use multiline strings
+  // - Error : stop compile
+  // - Warning : careful
+  // error does not throw so do not stop - report everything but if typecheck, generate wrong
     import reflect._
     import scala.tasty.TastyTypecheckError
 
@@ -51,7 +59,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
       var i = 0
       val l = s.length
       if(l >= 1 && s.charAt(i) == '%') i += 1 
-      else throw new TastyTypecheckError("too many arguments for interpolated string") //TODO : not a typecheck error and position
+      else throw new TastyTypecheckError("too many arguments for interpolated string") //TODO : not a typecheck error and position 
 
       while(i < l && isFlag(s.charAt(i))) {i += 1}
       while(i < l && Character.isDigit(s.charAt(i))) {i += 1}
@@ -59,7 +67,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
         i += 1
         while(i < l && Character.isDigit(s.charAt(i))) {i += 1}
       }
-      if(i >= l) throw new TastyTypecheckError("Missing conversion operator in '" + s + "'; use %% for literal %, %n for newline") 
+      if(i >= l) throw new TastyTypecheckError("Missing conversion operator in '" + s + "'; use %% for literal %, %n for newline")
       i
     }
   
@@ -84,7 +92,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
         part.charAt(i) match { 
             case 'c' | 'C' => 
               if(!checkSubtype(arg.tpe, definitions.CharType, definitions.ByteType, definitions.ShortType, definitions.IntType))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Char\n") //TODO : position
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Char\n") //TODO : position
             case 'd' | 'o' | 'x' | 'X' => 
               if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger])){
                 val conversionDetail = if(arg.tpe <:< definitions.StringType) { //TODO : when?
@@ -93,18 +101,18 @@ object FIntepolator extends MacroStringInterpolator[String] {
                   "and value strToInt1 of type String => Int\n" +
                   "are possible conversion functions from String to Int\n"
                 } else ""
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Int\n" + conversionDetail) //TODO : position
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Int\n" + conversionDetail) //TODO : position
               }
             case 'e' | 'E' |'f' | 'g' | 'G' | 'a' | 'A' =>
               if (!checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, typeOf[java.math.BigDecimal]))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Double\n") //TODO : position
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Double\n") //TODO : position
             case 't' | 'T' => 
               if (!checkSubtype(arg.tpe, definitions.LongType, typeOf[java.util.Calendar], typeOf[java.util.Date]))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : \n") //TODO : add required + position
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : \n") //TODO : add required + position
             case 'b' | 'B' => 
               if (!checkSubtype(arg.tpe, definitions.BooleanType, definitions.NullType))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Boolean\n") //TODO : position
-            case '%' | 'n' | 's' | 'S' | 'h' | 'H' => 
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Boolean\n") //TODO : position
+            case 'b' | 'B' |'h' | 'H' | 's' | 'S' | '%' | 'n' =>
             case illegal => 
               throw new TastyTypecheckError("illegal conversion character '" + illegal + "'") //TODO : not a type check error 
         }
@@ -112,12 +120,13 @@ object FIntepolator extends MacroStringInterpolator[String] {
     } 
       
     // macro expansion
-    '((~parts2.mkString.toExpr).format(~args.toExprOfList: _*)) 
+    '{(${parts2.mkString.toExpr}).format(${args.toExprOfList}: _*)}
   }
 
   override protected def getStaticStringContext(strCtxExpr: Expr[StringContext])(implicit reflect: Reflection): StringContext = {
     import reflect._
-    getStringContext(getListOfExpr(strCtxExpr))
+    //TODO : use this expr(SC)
+    getStringContext(getListOfExpr(strCtxExpr)) 
   }
 
   /**
@@ -216,7 +225,8 @@ abstract class MacroStringInterpolator[T] {
    * @throws NotStaticlyKnownError if the elements of the list are trees
    */
   protected def getArgsList(argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): List[Expr[Any]] = {
-    import reflect._
+    import reflect._ 
+    // TODO : use this for the position of the argument 
     argsExpr.unseal.underlyingArgument match {
       case Term.Typed(Term.Repeated(args, _), _) => args.map(_.seal[Any])
       case tree => throw new NotStaticlyKnownError("Expected statically known argument list", tree.seal[Any])
@@ -228,11 +238,11 @@ abstract class MacroStringInterpolator[T] {
       // TODO define in stdlib?
       implicit def ListIsLiftable: Liftable[List[String]] = new Liftable[List[String]] {
         override def toExpr(list: List[String]): Expr[List[String]] = list match {
-          case x :: xs => '(~x.toExpr :: ~toExpr(xs))
-          case Nil => '(Nil)
+          case x :: xs => '{${x.toExpr} :: ${toExpr(xs)}}
+          case Nil => '{Nil}
         }
       }
-      '(StringContext(~strCtx.parts.toList.toExpr: _*))
+      '{StringContext(${strCtx.parts.toList.toExpr}: _*)}
     }
   }
 
