@@ -8,28 +8,14 @@ import scala.quoted.Toolbox.Default._
 object Macro {
 
   class StringContextOps(strCtx: => StringContext) {
-    inline def s2(args: Any*): String = ~SIntepolator('(strCtx), '(args))
-    inline def raw2(args: Any*): String = ~RawIntepolator('(strCtx), '(args))
-    inline def foo(args: Any*): String = ~FooIntepolator('(strCtx), '(args))
     inline def f2(args: Any*): String = ~FIntepolator('(strCtx), '(args))
   }
   implicit inline def SCOps(strCtx: => StringContext): StringContextOps = new StringContextOps(strCtx)
 }
 
-object SIntepolator extends MacroStringInterpolator[String] {
-  protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] =
-    '((~strCtx.toExpr).s(~args.toExprOfList: _*))
-}
-
 object FIntepolator extends MacroStringInterpolator[String] {
-  /**
-    * Interpolates the given arguments to the formatted string
-    * @param strCtx that contains all the chunks of the formatted string
-    * @param args the list of arguments to interpolate to the string in the correct format
-    * @return the expression containing the formatted and interpolated string
-    * @throws IllegalArgumentException if the given format is not correct  //TODO : modify to a compiler abortion   
-    */
-  protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] = {
+  
+  override protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] = {
     import reflect._
     import scala.tasty.TastyTypecheckError
 
@@ -39,8 +25,8 @@ object FIntepolator extends MacroStringInterpolator[String] {
       * @param possibilities all the types within which we want to find a super type of tpe
       * @return true if the given type is a subtype of at least one of the possibilities, false otherwise
       */
-    def checkSubtype(tpe : Type, possibilities : Type*) : Option[Type] = {
-      possibilities.find(tpe <:< _)
+    def checkSubtype(tpe : Type, possibilities : Type*) : Boolean = {
+      possibilities.find(tpe <:< _).nonEmpty
     }
 
     /**
@@ -58,18 +44,22 @@ object FIntepolator extends MacroStringInterpolator[String] {
      * and returns the corresponding index
      * @param s the given string containing the formatting string as substring
      * @param argPos the position of the argument to format, only useful to throw errors
+     * @throws TastyTypecheckError if the formatting string has not the correct format
      * @return the index of the formatting string
      */
-    def getFormatTypeIndex(s : String, argPos : reflect.Position) = { //TODO : ask what is a reflect position and how to exploit it to throw compiler errors
+    def getFormatTypeIndex(s : String, argPos : reflect.Position) = {
       var i = 0
       val l = s.length
+      if(l >= 1 && s.charAt(i) == '%') i += 1 
+      else throw new TastyTypecheckError("too many arguments for interpolated string") //TODO : not a typecheck error and position
+
       while(i < l && isFlag(s.charAt(i))) {i += 1}
       while(i < l && Character.isDigit(s.charAt(i))) {i += 1}
       if(i < l && s.charAt(i) == '.') {
         i += 1
         while(i < l && Character.isDigit(s.charAt(i))) {i += 1}
       }
-      if(i >= l) throw new IllegalArgumentException("Wrong parameter : " + argPos) 
+      if(i >= l) throw new TastyTypecheckError("Missing conversion operator in '" + s + "'; use %% for literal %, %n for newline") 
       i
     }
   
@@ -79,41 +69,87 @@ object FIntepolator extends MacroStringInterpolator[String] {
       case p :: parts1 => p :: parts1.map(part => if(!part.startsWith("%")) "%s" + part else part)
     }
 
-    if(parts2.size - 1 != args.size && !(parts2.isEmpty && args.isEmpty)) throw new TastyTypecheckError("Missing parameter")
+    val format = parts2.size - 1
+    val argument = args.size
+
+    //TODO : should not be a typecheck error + add position
+    if(format > argument && !(parts2.isEmpty && args.isEmpty)) throw new TastyTypecheckError("too few arguments for interpolated string")
+    if (format < argument && !(parts2.isEmpty && args.isEmpty)) throw new TastyTypecheckError("too many arguments for interpolated string")
+    if(parts2.isEmpty) throw new TastyTypecheckError("there are no parts")
 
     // typechecking 
     if(!parts2.isEmpty) {
       parts2.tail.zip(args.map(_.unseal)).foreach((part, arg) => { 
         val i = getFormatTypeIndex(part, arg.pos)
         part.charAt(i) match { 
-            case 'b' | 'B' =>  
-            case 'h' | 'H' => 
-            case 's' | 'S' => 
-            case 'c' | 'C' if checkSubtype(arg.tpe, definitions.CharType, definitions.ByteType, definitions.ShortType, definitions.IntType).nonEmpty => 
-            case 'd' | 'o' | 'x' | 'X' if checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger]).nonEmpty =>
-            case 'e' | 'E' |'f' | 'g' | 'G' | 'a' | 'A' if checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, typeOf[java.math.BigDecimal]).nonEmpty => 
-            case 't' | 'T' if checkSubtype(arg.tpe, definitions.LongType, typeOf[java.util.Calendar], typeOf[java.util.Date]).nonEmpty => 
-            case '%' => 
-            case 'n' => 
-            case _ => 
-              throw new TastyTypecheckError("Wrong parameter : " + arg.pos)
+            case 'c' | 'C' => 
+              if(!checkSubtype(arg.tpe, definitions.CharType, definitions.ByteType, definitions.ShortType, definitions.IntType))
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Char\n") //TODO : position
+            case 'd' | 'o' | 'x' | 'X' => 
+              if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger])){
+                val conversionDetail = if(arg.tpe <:< definitions.StringType) { //TODO : when?
+                  "Note that implicit conversions are not applicable because they are ambiguous:\n" + 
+                  "both value strToInt2 of type String => Int\n" + 
+                  "and value strToInt1 of type String => Int\n" +
+                  "are possible conversion functions from String to Int\n"
+                } else ""
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Int\n" + conversionDetail) //TODO : position
+              }
+            case 'e' | 'E' |'f' | 'g' | 'G' | 'a' | 'A' =>
+              if (!checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, typeOf[java.math.BigDecimal]))
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Double\n") //TODO : position
+            case 't' | 'T' => 
+              if (!checkSubtype(arg.tpe, definitions.LongType, typeOf[java.util.Calendar], typeOf[java.util.Date]))
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : \n") //TODO : add required + position
+            case 'b' | 'B' => 
+              if (!checkSubtype(arg.tpe, definitions.BooleanType, definitions.NullType))
+                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Boolean\n") //TODO : position
+            case '%' | 'n' | 's' | 'S' | 'h' | 'H' => 
+            case illegal => 
+              throw new TastyTypecheckError("illegal conversion character '" + illegal + "'") //TODO : not a type check error 
         }
       })
-    }
+    } 
       
     // macro expansion
     '((~parts2.mkString.toExpr).format(~args.toExprOfList: _*)) 
   }
-}
 
-object RawIntepolator extends MacroStringInterpolator[String] {
-  protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] =
-    '((~strCtx.toExpr).raw(~args.toExprOfList: _*))
-}
+  override protected def getStaticStringContext(strCtxExpr: Expr[StringContext])(implicit reflect: Reflection): StringContext = {
+    import reflect._
+    getStringContext(getListOfExpr(strCtxExpr))
+  }
 
-object FooIntepolator extends MacroStringInterpolator[String] {
-  protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] =
-    '((~strCtx.toExpr).s(~args.map(_ => '("foo")).toExprOfList: _*))
+  /**
+   * Transforms a given expression containing a StringContext into a list of expressions containing strings
+   * @param strCtxExpr the given expression to convert
+   * @throws NotNotStaticlyKnownError if the StringContext contained inside the given expression does not contain only
+   * String literals
+   * @return a list of expr of string corresponding to the parts of the given StringContext
+   */
+  protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
+    import reflect._
+    strCtxExpr.unseal.underlyingArgument match {
+      case Term.Select(Term.Typed(Term.Apply(_, List(Term.Apply(_, List(Term.Typed(Term.Repeated(strCtxArgTrees, _), TypeTree.Inferred()))))), _), _) =>
+        strCtxArgTrees.map(_.seal[String])
+      case tree =>
+        throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
+    }
+  }
+
+  /**
+   * Computes the StringContext from a given list of expr containing strings
+   * @param listExprStr the given list of expr of strings
+   * @return the StringContext containing all the strings inside the given list
+   */
+  protected def getStringContext(listExprStr : List[Expr[String]])(implicit reflect: Reflection) : StringContext = {
+    import reflect._
+    val strings = listExprStr.map(_.unseal match {
+      case Term.Literal(Constant.String(str)) => str
+      case tree =>  throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
+    })
+    new StringContext(strings : _*)
+  }
 }
 
 // TODO put this class in the stdlib or separate project?
@@ -134,11 +170,31 @@ abstract class MacroStringInterpolator[T] {
     }
   }
 
+  /**
+    * Interpolates the given arguments to the formatted string
+    * @param strCtxExpr the expression that holds the StringContext which contains all the chunks of the formatted string
+    * @param args the expression that holds the sequence of arguments to interpolate to the string in the correct format
+    * @return the expression containing the formatted and interpolated string
+    * @throws TastyTypecheckError if the given format is not correct
+    */
   protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[T] =
     interpolate(getStaticStringContext(strCtxExpr), getArgsList(argsExpr)) 
 
+  /**
+    * Interpolates the given arguments to the formatted string
+    * @param strCtx that contains all the chunks of the formatted string
+    * @param args the list of arguments to interpolate to the string in the correct format
+    * @return the expression containing the formatted and interpolated string
+    * @throws TastyTypecheckError if the given format is not correct  
+    */
   protected def interpolate(strCtx: StringContext, argExprs: List[Expr[Any]])(implicit reflect: Reflection): Expr[T]
 
+  /**
+  * Computes a StringContext given an Expression of it
+  * @param strCtxExpr the given expression containing the StringContext
+  * @return the computed StringContext
+  * @throws NotStaticlyKnownError if the elements of the StringContext are trees or if the unsealed expression is a tree
+  */
   protected def getStaticStringContext(strCtxExpr: Expr[StringContext])(implicit reflect: Reflection): StringContext = {
     import reflect._
     strCtxExpr.unseal.underlyingArgument match {
@@ -153,6 +209,12 @@ abstract class MacroStringInterpolator[T] {
     }
   }
 
+  /**
+   * Computes a list of expr from a given expr of sequence of elements
+   * @param argsExpr the given expression
+   * @return the computed list
+   * @throws NotStaticlyKnownError if the elements of the list are trees
+   */
   protected def getArgsList(argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): List[Expr[Any]] = {
     import reflect._
     argsExpr.unseal.underlyingArgument match {

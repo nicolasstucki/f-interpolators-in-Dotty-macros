@@ -1,5 +1,5 @@
-[0m[[0m[31merror[0m] [0m[0m[34m-- [E008] Member Not Found Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:94:140 [0m[0m
-[0m[[0m[31merror[0m] [0m[0m[31m94 |[0m            [33mcase[0m [31m'e'[0m | [31m'E'[0m |[31m'f'[0m | [31m'g'[0m | [31m'G'[0m | [31m'a'[0m | [31m'A'[0m [33mif[0m checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, definitions.BigDecimal).nonEmpty => [0m
-[0m[[0m[31merror[0m] [0m[0m   |                                                                                                                                [31m^^^^^^^^^^^^^^^^^^^^^^[0m[0m
-[0m[[0m[31merror[0m] [0m[0m   |              value BigDecimal is not a member of reflect.DefinitionsAPI[0m
+[0m[[0m[31merror[0m] [0m[0m[34m-- [E040] Syntax Error: /Users/saraalemanno/Documents/GitHub/f-interpolators-in-Dotty-macros/src/main/scala/Macro.scala:87:16 [0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m87 |[0m                [33mthrow[0m [33mnew[0m [35mTastyTypecheckError[0m([31m"type mismatch;\n found : "[0m + arg.tpe.show + [31m"\nrequired : Char\n"[0m) [34m//TODO : position[0m[0m
+[0m[[0m[31merror[0m] [0m[0m   |                [31m^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m   |                [31m'=>[0m' expected, but [31m'throw[0m' found[0m
 [0m[[0m[31merror[0m] [0m[0mone error found[0m

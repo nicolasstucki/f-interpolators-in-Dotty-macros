@@ -12,17 +12,9 @@ import Macro._
   */
 class PositiveTest {
 
-  @Test def otherMacrosTest() = {
-    val w = "world"
-    println(f2"${"hi"}%s")
-    println(s2"Hello $w!")
-    println(raw2"Hello $w!\n")
-    println(foo"Hello $w!")
-  }
+  @Test def generalArgsTests() = {  
 
-  @Test def generalArgsTests() = {
-
-    def booleanTest(b : Boolean) = f2"The boolean is $b%b"
+    def booleanTest(b : Boolean) = f2"The boolean is $b%b" 
 
     def hTest(arg : Int) = f2"$arg%h"
 
@@ -85,7 +77,7 @@ class PositiveTest {
 
     def decimalFloatingPointTest(f : Float) = {
       f2"The decimal floating point is $f%f, $f%3.2f, $f%15.3f"
-    }
+    } 
 
     def noPointFloatingPointTest(f : Float) = {
       f2"The decimal floating point is $f%2.0f"
