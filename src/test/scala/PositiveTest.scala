@@ -28,7 +28,7 @@ class PositiveTest {
     val arg : Int = 10
     val expected = Integer.toHexString(arg.hashCode)
     assertEquals(expected.toString, hTest(arg))
-
+ 
     assertEquals("The string is null", stringTest(null))
     assertEquals("The string is ", stringTest(""))
     assertEquals("The string is string1", stringTest("string1"))

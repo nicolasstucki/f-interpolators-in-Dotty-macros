@@ -13,19 +13,52 @@ object Macro {
 }
 
 object FIntepolator extends MacroStringInterpolator[String] {
-  
-  override protected def interpolate(strCtx: StringContext, args: List[Expr[Any]])(implicit reflect: Reflection): Expr[String] = { 
-  //TODO : should switch to other version -- interpolate(strCtx: Expr[StringContext], args: List[Expr[Any]])  
-  // use upper ones and then gets the real elements afterwards
-  // unseal expr and get pos in list of expr  
 
-  //TODO : start to throw error and use warnings 
-  // - same line, show only one - use multiline strings
-  // - Error : stop compile
-  // - Warning : careful
-  // error does not throw so do not stop - report everything but if typecheck, generate wrong
+  /**
+   * Transforms a given expression containing a StringContext into a list of expressions containing strings
+   * @param strCtxExpr the given expression to convert
+   * @throws NotNotStaticlyKnownError if the StringContext contained inside the given expression does not contain only
+   * String literals
+   * @return a list of expr of string corresponding to the parts of the given StringContext
+   */
+  protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
     import reflect._
-    import scala.tasty.TastyTypecheckError
+    strCtxExpr.unseal.underlyingArgument match {
+      case Term.Select(Term.Typed(Term.Apply(_, List(Term.Apply(_, List(Term.Typed(Term.Repeated(strCtxArgTrees, _), TypeTree.Inferred()))))), _), _) =>
+        strCtxArgTrees.map(_.seal[String])
+      case tree =>
+        throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
+    }
+  }
+
+  /**
+   * Computes the StringContext from a given list of expr containing strings
+   * @param listExprStr the given list of expr of strings
+   * @return the StringContext containing all the strings inside the given list
+   * @throws NotStaticlyKnownError if the list of expr of strings does not contain only string literals
+   */
+  protected def getStringContext(listExprStr : List[Expr[String]])(implicit reflect: Reflection) : StringContext = {
+    import reflect._
+    val strings = listExprStr.map(stringExprToString)
+    new StringContext(strings : _*)
+  }
+
+  /**
+   * Computes the String from a given expr containing a string
+   * @param stringExpr the given expr of string
+   * @return the String contained in the given expr
+   * @throws NotStaticlyKnownError if the given expr does not contain a string literal
+   */
+  protected def stringExprToString(stringExpr : Expr[String])(implicit reflect : Reflection) : String = {
+    import reflect._
+    stringExpr.unseal match {
+      case Term.Literal(Constant.String(str)) => str
+      case tree =>  throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
+    }
+  }
+
+  override protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[String] = {
+    import reflect._
 
     /**
       * Checks if a given type is a subtype of any of the possibilities
@@ -59,7 +92,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
       var i = 0
       val l = s.length
       if(l >= 1 && s.charAt(i) == '%') i += 1 
-      else throw new TastyTypecheckError("too many arguments for interpolated string") //TODO : not a typecheck error and position 
+      else error("too many arguments for interpolated string", argPos)
 
       while(i < l && isFlag(s.charAt(i))) {i += 1}
       while(i < l && Character.isDigit(s.charAt(i))) {i += 1}
@@ -67,97 +100,61 @@ object FIntepolator extends MacroStringInterpolator[String] {
         i += 1
         while(i < l && Character.isDigit(s.charAt(i))) {i += 1}
       }
-      if(i >= l) throw new TastyTypecheckError("Missing conversion operator in '" + s + "'; use %% for literal %, %n for newline")
+      if(i >= l) error("Missing conversion operator in '" + s + "'; use %% for literal %, %n for newline", argPos)
       i
     }
-  
+
+    val partsExpr = getListOfExpr(strCtxExpr)
+    val args = getArgsList(argsExpr)
+    
     // add the default "%s" format if no format is given by the user"
-    val parts2 = strCtx.parts.toList match {
+    val parts2 = partsExpr.map(stringExprToString) match {
       case Nil => Nil
       case p :: parts1 => p :: parts1.map(part => if(!part.startsWith("%")) "%s" + part else part)
     }
 
+    //check if the number of arguments are the same as the number of formatting strings
     val format = parts2.size - 1
     val argument = args.size
 
-    //TODO : should not be a typecheck error + add position
-    if(format > argument && !(parts2.isEmpty && args.isEmpty)) throw new TastyTypecheckError("too few arguments for interpolated string")
-    if (format < argument && !(parts2.isEmpty && args.isEmpty)) throw new TastyTypecheckError("too many arguments for interpolated string")
-    if(parts2.isEmpty) throw new TastyTypecheckError("there are no parts")
+    if(format > argument && !(parts2.isEmpty && args.isEmpty)) {
+      println(if(args.isEmpty) argsExpr.unseal.pos else args(argument - 1).unseal.underlyingArgument.pos)
+      error("too few arguments for interpolated string", if(args.isEmpty) argsExpr.unseal.pos else args(argument - 1).unseal.underlyingArgument.pos) //TODO : wrong position if empty
+    }
+    if (format < argument && !(parts2.isEmpty && args.isEmpty)) 
+      error("too many arguments for interpolated string", if(args.isEmpty) argsExpr.unseal.pos else args(argument - 1).unseal.underlyingArgument.pos) //TODO : wrong position if empty
+    if(parts2.isEmpty) error("there are no parts", strCtxExpr.unseal.underlyingArgument.pos) //TODO : wrong position
 
     // typechecking 
     if(!parts2.isEmpty) {
-      parts2.tail.zip(args.map(_.unseal)).foreach((part, arg) => { 
+      (parts2.tail, args.map(_.unseal), partsExpr.tail).zipped.foreach{(part, arg, partExpr) => {  //TODO : for (v <- ..)
         val i = getFormatTypeIndex(part, arg.pos)
         part.charAt(i) match { 
             case 'c' | 'C' => 
               if(!checkSubtype(arg.tpe, definitions.CharType, definitions.ByteType, definitions.ShortType, definitions.IntType))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Char\n") //TODO : position
+                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Char\n", arg.pos)
             case 'd' | 'o' | 'x' | 'X' => 
-              if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger])){
-                val conversionDetail = if(arg.tpe <:< definitions.StringType) { //TODO : when?
-                  "Note that implicit conversions are not applicable because they are ambiguous:\n" + 
-                  "both value strToInt2 of type String => Int\n" + 
-                  "and value strToInt1 of type String => Int\n" +
-                  "are possible conversion functions from String to Int\n"
-                } else ""
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Int\n" + conversionDetail) //TODO : position
-              }
+              if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger]))
+                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Int\n", arg.pos)
             case 'e' | 'E' |'f' | 'g' | 'G' | 'a' | 'A' =>
               if (!checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, typeOf[java.math.BigDecimal]))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Double\n") //TODO : position
+                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Double\n", arg.pos)
             case 't' | 'T' => 
               if (!checkSubtype(arg.tpe, definitions.LongType, typeOf[java.util.Calendar], typeOf[java.util.Date]))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : \n") //TODO : add required + position
+                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Date\n", arg.pos)
             case 'b' | 'B' => 
               if (!checkSubtype(arg.tpe, definitions.BooleanType, definitions.NullType))
-                throw new TastyTypecheckError("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Boolean\n") //TODO : position
+                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Boolean\n", arg.pos)
             case 'b' | 'B' |'h' | 'H' | 's' | 'S' | '%' | 'n' =>
             case illegal => 
-              throw new TastyTypecheckError("illegal conversion character '" + illegal + "'") //TODO : not a type check error 
+              val partPos = partExpr.unseal.pos
+              error("illegal conversion character '" + illegal + "'", partPos)
         }
-      })
+      }}
     } 
       
     // macro expansion
     '{(${parts2.mkString.toExpr}).format(${args.toExprOfList}: _*)}
-  }
-
-  override protected def getStaticStringContext(strCtxExpr: Expr[StringContext])(implicit reflect: Reflection): StringContext = {
-    import reflect._
-    //TODO : use this expr(SC)
-    getStringContext(getListOfExpr(strCtxExpr)) 
-  }
-
-  /**
-   * Transforms a given expression containing a StringContext into a list of expressions containing strings
-   * @param strCtxExpr the given expression to convert
-   * @throws NotNotStaticlyKnownError if the StringContext contained inside the given expression does not contain only
-   * String literals
-   * @return a list of expr of string corresponding to the parts of the given StringContext
-   */
-  protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
-    import reflect._
-    strCtxExpr.unseal.underlyingArgument match {
-      case Term.Select(Term.Typed(Term.Apply(_, List(Term.Apply(_, List(Term.Typed(Term.Repeated(strCtxArgTrees, _), TypeTree.Inferred()))))), _), _) =>
-        strCtxArgTrees.map(_.seal[String])
-      case tree =>
-        throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
-    }
-  }
-
-  /**
-   * Computes the StringContext from a given list of expr containing strings
-   * @param listExprStr the given list of expr of strings
-   * @return the StringContext containing all the strings inside the given list
-   */
-  protected def getStringContext(listExprStr : List[Expr[String]])(implicit reflect: Reflection) : StringContext = {
-    import reflect._
-    val strings = listExprStr.map(_.unseal match {
-      case Term.Literal(Constant.String(str)) => str
-      case tree =>  throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
-    })
-    new StringContext(strings : _*)
   }
 }
 
@@ -170,12 +167,6 @@ abstract class MacroStringInterpolator[T] {
       case ex: NotStaticlyKnownError =>
         // TODO use ex.expr to recover the position
         throw new QuoteError(ex.getMessage)
-      case ex: StringContextError =>
-        // TODO use ex.idx to recover the position
-        throw new QuoteError(ex.getMessage)
-      case ex: ArgumentError =>
-        // TODO use ex.idx to recover the position
-        throw new QuoteError(ex.getMessage)
     }
   }
 
@@ -186,17 +177,7 @@ abstract class MacroStringInterpolator[T] {
     * @return the expression containing the formatted and interpolated string
     * @throws TastyTypecheckError if the given format is not correct
     */
-  protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[T] =
-    interpolate(getStaticStringContext(strCtxExpr), getArgsList(argsExpr)) 
-
-  /**
-    * Interpolates the given arguments to the formatted string
-    * @param strCtx that contains all the chunks of the formatted string
-    * @param args the list of arguments to interpolate to the string in the correct format
-    * @return the expression containing the formatted and interpolated string
-    * @throws TastyTypecheckError if the given format is not correct  
-    */
-  protected def interpolate(strCtx: StringContext, argExprs: List[Expr[Any]])(implicit reflect: Reflection): Expr[T]
+  protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[T]
 
   /**
   * Computes a StringContext given an Expression of it
@@ -247,7 +228,5 @@ abstract class MacroStringInterpolator[T] {
   }
 
   protected class NotStaticlyKnownError(msg: String, expr: Expr[Any]) extends Exception(msg)
-  protected class StringContextError(msg: String, idx: Int, start: Int = -1, end: Int = -1) extends Exception(msg)
-  protected class ArgumentError(msg: String, idx: Int) extends Exception(msg)
 
 }
