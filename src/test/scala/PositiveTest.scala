@@ -62,8 +62,7 @@ class PositiveTest {
     assertEquals("The decimal integer is 2,  2, 2+1 = 3",
       decimalIntegerTest(2))
 
-    //TODO : decimalIntegerTest("hello") //TODO : does not compile -- not an exception do throw exception inside macro and catch it here 
-    //TODO : IllegalFormatConversionException 
+    //TODO : decimalIntegerTest("hello")
 
     assertEquals("The octal integer is 2", octalIntegerTest(2))
     assertEquals("The octal integer is 10", octalIntegerTest(8))
@@ -118,6 +117,6 @@ class PositiveTest {
     }
 
     assertEquals("the percentage is 100 %", percentArgsTest())
-    assertEquals("we have a line separator now %n and now, we are on the next line", lineSeparatorArgs())
+    assertEquals("we have a line separator now %n and now, we are on the next line", lineSeparatorArgs()) 
   }
 }

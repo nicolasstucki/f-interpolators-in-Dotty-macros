@@ -14,7 +14,7 @@ object Test2 {
        println(f2"Bob is $n%2d years old")
        println(s"Bob will be ${n+1} years old")
        // println(f2"Bob will be ${n+1}%2d years old")
-       println(s"$n+1 = ${n+1}")
+       println(s"$n+1 = ${n+1}") 
        // println(f2"$n%d+1 = ${n+1}%d")
      }
 
@@ -35,7 +35,7 @@ object Test2 {
      println(s"")
      println(s"${0}")
      println(s"${0}${0}")
-     println(f2"")
+     println(f2"") 
      println(f2"${0}")
      println(f2"${0}${0}")
    }

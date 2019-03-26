@@ -19,10 +19,10 @@ object Test extends App {
   }
 
   // 1) number of arguments
-  //new StringContext().f2() // TODO
+  //new StringContext().f2() 
   //new StringContext("", " is ", "%2d years old").f2(s)
   //new StringContext("", " is ", "%2d years old").f2(s, d, d)
-  //new StringContext("", "").f2() //TODO
+  //new StringContext("", "").f2() 
 
   // 2) Interpolation mismatches
   //f2"$s%b"
@@ -43,20 +43,20 @@ object Test extends App {
 
   // f2"$s%i"  
 
-  // 3) flag mismatches //TODO next time
-  // f2"$s%+ 0,(s"
+  // 3) flag mismatches
+  // f2"$s%+ 0,(s"  
   // f2"$c%#+ 0,(c"
   // f2"$d%#d"
   // f2"$d%,x"
   // f2"$d%+ (x"
   // f2"$f%,(a"
   // f2"$t%#+ 0,(tT"
-
-  // 4) bad precisions //TODO next time
+  
+  // 4) bad precisions 
   // f2"$c%.2c"
-  // f2"$d%.2d"
+  // f2"$d%.2d" 
   // f2"%.2%"
-  // f2"%.2n"
+  // f2"%.2n" 
   // f2"$f%.2a"
   // f2"$t%.2tT"
 
