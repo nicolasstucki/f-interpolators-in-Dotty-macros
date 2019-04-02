@@ -19,21 +19,22 @@ object Test extends App {
   }
 
   // 1) number of arguments
-  //new StringContext().f2() 
-  //new StringContext("", " is ", "%2d years old").f2(s)
-  //new StringContext("", " is ", "%2d years old").f2(s, d, d)
-  //new StringContext("", "").f2() 
+  // new StringContext().f2() 
+  // StringContext().f2() 
+  // new StringContext("", " is ", "%2d years old").f2(s)
+  // new StringContext("", " is ", "%2d years old").f2(s, d, d)
+  // new StringContext("", "").f2() 
 
   // 2) Interpolation mismatches
-  //f2"$s%b"
-  //f2"$s%c"
-  //f2"$f%c"
-  //f2"$s%x"
-  //f2"$b%d"
-  //f2"$s%d"
-  //f2"$f%o"
-  //f2"$s%e" 
-  //f2"$b%f"
+  // f2"$s%b"
+  // f2"$s%c"
+  // f2"$f%c"
+  // f2"$s%x"
+  // f2"$b%d"
+  // f2"$s%d"
+  // f2"$f%o"
+  // f2"$s%e" 
+  // f2"$b%f"
 
   // {
   //   implicit val strToInt1 = (s: String) => 1
@@ -60,26 +61,27 @@ object Test extends App {
   // f2"$f%.2a"
   // f2"$t%.2tT"
 
-  // 5) bad indexes //TODO next time
-  // f2"%<s"
+  // 5) bad indexes 
+  // f2"%<s" 
   // f2"%<c"
   // f2"%<tT"
-  // f2"${8}%d ${9}%d%3$$d"
-  // f2"${8}%d ${9}%d%0$$d"
+  // f2"%1$$n" 
+  // f2"${8}%d ${9}%d%3$$d" //TODO
+  // f2"${8}%d ${9}%d%0$$d" //TODO
 
-  // warnings //TODO next time
+  // // warnings 
   // f2"${8}%d ${9}%1$$d"
-  // f2"$s%s $s%s %1$$<s"
+  // f2"$s%s $s%s %1$$<s" //TODO
   // f2"$s%s $s%1$$s"
 
   // 6) bad arg types //TODO next time
-  //f2"$s%#s"
+  // f2"$s%#s"
 
   // 7) misunderstood conversions 
-  // f2"$t%tG" //TODO next time
-  // f2"$t%t" //TODO next time
+  // f2"$t%tG" 
+  // f2"$t%t"
   // f2"$s%10.5"
 
   // 8) other brain failures //TODO next time
-  //f2"${d}random-leading-junk%d"
+  // f2"${d}random-leading-junk%d"
 }

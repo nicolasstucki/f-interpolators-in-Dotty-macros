@@ -1,5 +1,3 @@
-//TODO : write what is in the mail
-
 import scala.quoted._
 import scala.tasty._
 

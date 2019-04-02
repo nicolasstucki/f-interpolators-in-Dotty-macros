@@ -62,8 +62,6 @@ class PositiveTest {
     assertEquals("The decimal integer is 2,  2, 2+1 = 3",
       decimalIntegerTest(2))
 
-    //TODO : decimalIntegerTest("hello")
-
     assertEquals("The octal integer is 2", octalIntegerTest(2))
     assertEquals("The octal integer is 10", octalIntegerTest(8))
 
@@ -105,7 +103,45 @@ class PositiveTest {
     assertEquals("The float value is -Infinity", aTest(Float.NegativeInfinity))
   }
 
-  //TODO : @Test def dateArgsTests() = ??? 
+  @Test def dateArgsTests() = {
+    import java.text.SimpleDateFormat
+
+    val sdf = new SimpleDateFormat("dd-M-yyyy hh:mm:ss")
+    val dateInString = "31-08-1982 10:20:56"
+    val date = sdf.parse(dateInString)
+
+    assertEquals(f2"$date%tH", "10")
+    assertEquals(f2"$date%tI", "10")
+    assertEquals(f2"$date%tk", "10")
+    assertEquals(f2"$date%tl", "10")
+    assertEquals(f2"$date%tM", "20")
+    assertEquals(f2"$date%tS", "56")
+    assertEquals(f2"$date%tL", "000")
+    assertEquals(f2"$date%tN", "000000000")
+    assertEquals(f2"$date%tp", "am")
+    // assertEquals(f2"$date%tz", "+0200")
+    // assertEquals(f2"$date%tZ", "CEST")
+    // assertEquals(f2"$date%ts", "399630056")
+    // assertEquals(f2"$date%tQ", "399630056000")
+    // assertEquals(f2"$date%tB", "août")
+    // assertEquals(f2"$date%tb", "août")
+    // assertEquals(f2"$date%th", "août")
+    // assertEquals(f2"$date%tA", "mardi")
+    // assertEquals(f2"$date%ta", "mar.")
+    // assertEquals(f2"$date%tC", "19")
+    // assertEquals(f2"$date%tY", "1982")
+    // assertEquals(f2"$date%ty", "82")
+    // assertEquals(f2"$date%tj", "243")
+    // assertEquals(f2"$date%tm", "08")
+    // assertEquals(f2"$date%td", "31")
+    // assertEquals(f2"$date%te", "31")
+    // assertEquals(f2"$date%tR", "10:20")
+    // assertEquals(f2"$date%tT", "10:20:56")
+    // assertEquals(f2"$date%tr", "10:20:56 AM")
+    // assertEquals(f2"$date%tD", "08/31/82")
+    // assertEquals(f2"$date%tF", "1982-08-31")
+    // assertEquals(f2"$date%tc", "mar. août 31 10:20:56 CEST 1982")
+  } 
 
   @Test def specificLiteralsTests() = {
     def percentArgsTest() = {
@@ -118,5 +154,9 @@ class PositiveTest {
 
     assertEquals("the percentage is 100 %", percentArgsTest())
     assertEquals("we have a line separator now %n and now, we are on the next line", lineSeparatorArgs()) 
+  }
+
+  @Test def argumentsTests() = {
+    assertEquals(f2"${"a"}%s ${"b"}%s %<s", "a b b")
   }
 }

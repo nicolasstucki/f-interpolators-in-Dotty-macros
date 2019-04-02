@@ -10,4 +10,4 @@ with `sbt test`.
 ### Project 
 
 This is a semester project consisting in implementing Dotty macros for the f-interpolator. 
-The project started in february 2019 and it should be done in June 2019. 
+The project started in February 2019 and it should be done in June 2019. 
