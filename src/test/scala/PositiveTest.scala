@@ -23,7 +23,7 @@ class PositiveTest {
     def noFormatHasStringDefault(s : String) = f2"The string is $s"
 
     assertEquals("The boolean is false", booleanTest(false))
-    assertEquals("The boolean is true", booleanTest(true))
+    assertEquals("The boolean is true", booleanTest(true)) 
 
     val arg : Int = 10
     val expected = Integer.toHexString(arg.hashCode)
@@ -109,6 +109,8 @@ class PositiveTest {
     val sdf = new SimpleDateFormat("dd-M-yyyy hh:mm:ss")
     val dateInString = "31-08-1982 10:20:56"
     val date = sdf.parse(dateInString)
+
+    //TODO : set locale  : local set default 
 
     assertEquals(f2"$date%tH", "10")
     assertEquals(f2"$date%tI", "10")

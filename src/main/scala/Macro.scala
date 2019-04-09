@@ -61,14 +61,27 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
   override protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[String] = {
     import reflect._
+
     /**
       * Adds the default "%s" to the strings that do not have any given format
       * @param parts the list of strings to add the default format to if neeeded
       * @return a new list of string with all a defined formatting 
       */
-    def addDefaultFormat(parts : List[String]) : List[String] = parts match {
-      case Nil => Nil
-      case p :: parts1 => p :: parts1.map(part => if(!part.startsWith("%")) "%s" + part else part)
+    def addDefaultFormat(partsExpr : List[Expr[String]]) : List[String] = {
+       val parts : List[String] = partsExpr.map(stringExprToString)
+       parts match {
+        case Nil => Nil
+        case p :: parts1 => p :: parts1.zip(partsExpr.tail).map((part : String, partExpr : Expr[String]) => {
+          if(!part.startsWith("%")) {
+            val index = part.indexOf('%')
+            if(index != -1) {
+              val pos = partExpr.unseal.pos
+              error("conversions must follow a splice; use %% for literal %, %n for newline", pos.sourceFile, pos.start + index, pos.start + index)
+              "%s" + part
+            } else "%s" + part 
+          } else part
+        })
+      }
     }
 
     /**
@@ -124,9 +137,9 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
       //relative indexing
       val relative = s.charAt(formatIndex) == '<'
+      if(relative) formatIndex += 1
 
       //flags
-
       val flags = getFlags(formatIndex, l, s)
       formatIndex += flags.size
 
@@ -180,9 +193,9 @@ object FIntepolator extends MacroStringInterpolator[String] {
       if(i < l) {
         val curr = s.charAt(i)
         if(isFlag(curr))
-          curr :: getFlags(i + 1, l, s)
-      } 
-      Nil
+          return curr :: getFlags(i + 1, l, s)
+      }
+      return Nil
     }
 
     /**
@@ -199,52 +212,31 @@ object FIntepolator extends MacroStringInterpolator[String] {
       case c => error("'" + c + "' doesn't seem to be a date or time conversion", position.sourceFile, position.start + offset, position.start + offset)
     }
 
-    val partsExpr = getListOfExpr(strCtxExpr)
-    val args = getArgsList(argsExpr)
-
-    val parts = addDefaultFormat(partsExpr.map(stringExprToString))
-    
-    val argument = args.size
-    val argPos = if(args.isEmpty) argsExpr.unseal.pos else args(argument - 1).unseal.underlyingArgument.pos 
-    val strPos = strCtxExpr.unseal.underlyingArgument.pos 
-    checkSizes(parts.size - 1, argument, argPos, strPos)
-
-    // formatting parameters checking
-    if(!parts.isEmpty) {
-      if(parts.size == 1 && args.size == 0 && parts.head.size != 0){
-        val position = partsExpr.head.unseal.pos
-        val (i, argument, argumentIndex, _, width, widthIndex, precision, precisionIndex, relative) = getFormatTypeIndex(parts.head, position, true)
-
-        if(argument)
-          error("Argument index cannot be used if no argument is given", position.sourceFile, position.start + argumentIndex + 1, position.start + argumentIndex + 1)
-
-        if(relative)
-          error("No last arg", position.sourceFile, position.start + i + 1, position.start + i + 1)
-
-        parts.head.charAt(i) match {
-          case 'n' if(width) => error("width not allowed", position.sourceFile, position.start + widthIndex, position.start + widthIndex)
-          case 'n' | '%' => if(precision) error("precision not allowed", position.sourceFile, position.start + precisionIndex + 1, position.start + precisionIndex + 1) 
-          case illegal => 
-        }
-      }
-
-      val zippedd = (parts.tail, args.map(_.unseal), partsExpr.tail).zipped
-      for {(part, arg, partExpr) <- zippedd} {
-        val argPosition = arg.pos
+    /**
+      * Checks that a given part of the string context respects every formatting constraint
+      * for every parameter
+      * @param curr the argument that corresponds to the given part
+      * @param args the list of arguments
+      * @param part the given part of the string context
+      * @param partExpr the expression containing the given part of the string context
+      * @return an error if there has been a problem with any formatting parameter, nothing otherwise
+      */
+    def checkPart(curr : Expr[Any], args : List[Expr[Any]], part : String, partExpr : Expr[String], pos : Int) : Unit = {
+      val arg = curr.unseal
+      val argPosition = arg.pos
         val actualArgumentIndex : Int = args.indexOf(arg) + 1
         val (i, argument, argumentIndex, flags, width, widthIndex,precision, precisionIndex, relative) = getFormatTypeIndex(part, argPosition, false)
         val partPosition = partExpr.unseal.pos
 
         if(argument){
           if(relative)
-            warning("Argument index ignored if '<' flag is present", partPosition.sourceFile, partPosition.start + argumentIndex, partPosition.start + argumentIndex)
+            warning("Argument index ignored if '<' flag is present", partPosition.sourceFile, partPosition.start + argumentIndex + pos, partPosition.start + argumentIndex + pos)
           val usedArgumentIndex : Int = part.charAt(argumentIndex).asDigit
-          if(actualArgumentIndex != usedArgumentIndex)
-            warning("Index is not this arg", partPosition.sourceFile, partPosition.start + argumentIndex, partPosition.start + argumentIndex)
+
           if(usedArgumentIndex > args.size || usedArgumentIndex <= 0)
-            error("Argument index out of range", partPosition.sourceFile, partPosition.start + argumentIndex, partPosition.start + argumentIndex)
-        //TODO : problem : the string "${8}%d ${9}%d%3$$d" becomes StringContext("%d", "%d%3$d") => no index out of range
-        //TODO : problem : the string "$s%s $s%s %1$$<s" becomes StringContext("%s", "%s %1$<s") => no argument ignored
+            error("Argument index out of range", partPosition.sourceFile, partPosition.start + argumentIndex + pos, partPosition.start + argumentIndex + pos)
+          if(actualArgumentIndex != usedArgumentIndex)
+            warning("Index is not this arg", partPosition.sourceFile, partPosition.start + argumentIndex + pos, partPosition.start + argumentIndex + pos)
         }
 
         part.charAt(i) match { 
@@ -274,7 +266,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
               if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger]))
                 error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Int\n", argPosition)
               for{flag <- flags} flag match {
-                case '+' | ' ' | '(' if(!checkSubtype(arg.tpe, typeOf[java.math.BigInteger])) => error("only use '" + flag + "' for BigInt conversions to o, x, X", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
+                case '+' | ' ' | '(' if(!checkSubtype(arg.tpe, typeOf[java.math.BigInteger])) => error("Only use '" + flag + "' for BigInt conversions to o, x, X", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
                 case ',' => error("',' only allowed for d conversion of integral types", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
                 case _ => //OK
               }
@@ -298,7 +290,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
             case 't' | 'T' => {
               if (!checkSubtype(arg.tpe, definitions.LongType, typeOf[java.util.Calendar], typeOf[java.util.Date]))
                 error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Date\n", argPosition)
-              for{flag <- flags ; if flag == '-'} error("Only '-' allowed for date/time conversions", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
+              for{flag <- flags ; if flag != '-'} error("Only '-' allowed for date/time conversions", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
               if(precision) error("precision not allowed", partPosition.sourceFile, partPosition.start + precisionIndex, partPosition.start + precisionIndex)
               if(i == part.size - 1) error("Date/time conversion must have two characters", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
               
@@ -311,18 +303,73 @@ object FIntepolator extends MacroStringInterpolator[String] {
             case 'b' | 'B' => {
               if (!checkSubtype(arg.tpe, definitions.BooleanType, definitions.NullType))
                 error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Boolean\n", argPosition)
-              for{flag <- flags ; if (flag != '-' || flag != '#')} error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
+              for{flag <- flags ; if (flag != '-')} error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
             }
-            case 'h' | 'H' | 's' | 'S' => 
-              for{flag <- flags ; if (flag != '-' || flag != '#')} error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
-            
+            case 'h' | 'H' => 
+              for{flag <- flags ; if (flag != '-')} error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
+            case 's' | 'S' => 
+              for{flag <- flags ; if (flag != '-')} {
+                if(flag == '#' && !checkSubtype(typeOf[java.util.Formattable])) error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : java.util.Formattable\n", argPosition)
+                else error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
+              }
             case 'n' if(width) => error("width not allowed", partPosition.sourceFile, partPosition.start + widthIndex, partPosition.start + widthIndex)
             case 'n' | '%' => if(precision) error("precision not allowed", partPosition.sourceFile, partPosition.start + precisionIndex, partPosition.start + precisionIndex)
             case illegal => 
               val partPos = partExpr.unseal.pos
               error("illegal conversion character '" + illegal + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
         }
+
+        val (next, start) = newPart(part, i)
+        if(next != null) checkPart(curr, args, next, partExpr, i + start) 
+    } 
+
+    def newPart(string : String, index : Int) : (String, Int) = {
+      val substring = string.substring(index)
+      val size = substring.size
+      var i = 0
+      while (i < size){
+        if(substring.charAt(i) == '%'){
+          val start = i
+          i += 1
+          while(i < size && substring.charAt(i).isDigit) i += 1
+          if(substring.charAt(i) == '$') return (substring.substring(start), start)
+        }
+        i += 1
       }
+      (null, 0)
+    }
+
+    val partsExpr = getListOfExpr(strCtxExpr)
+    val args = getArgsList(argsExpr)
+    
+    val argument = args.size
+    val argPos = if(args.isEmpty) argsExpr.unseal.pos else args(argument - 1).unseal.underlyingArgument.pos 
+    val strPos = strCtxExpr.unseal.underlyingArgument.pos 
+    checkSizes(partsExpr.size - 1, argument, argPos, strPos)
+
+    val parts = addDefaultFormat(partsExpr)
+
+    // formatting parameters checking
+    if(!parts.isEmpty) {
+      if(parts.size == 1 && args.size == 0 && parts.head.size != 0){
+        val position = partsExpr.head.unseal.pos
+        val (i, argument, argumentIndex, _, width, widthIndex, precision, precisionIndex, relative) = getFormatTypeIndex(parts.head, position, true)
+
+        if(argument)
+          error("Argument index cannot be used if no argument is given", position.sourceFile, position.start + argumentIndex + 1, position.start + argumentIndex + 1)
+
+        if(relative)
+          error("No last arg", position.sourceFile, position.start + i + 1, position.start + i + 1)
+
+        parts.head.charAt(i) match {
+          case 'n' if(width) => error("width not allowed", position.sourceFile, position.start + widthIndex, position.start + widthIndex)
+          case 'n' | '%' => if(precision) error("precision not allowed", position.sourceFile, position.start + precisionIndex + 1, position.start + precisionIndex + 1) 
+          case illegal => 
+        }
+      }
+
+      val zippedd = (parts.tail, args, partsExpr.tail).zipped
+      for {(part, arg, partExpr) <- zippedd} checkPart(arg, args, part, partExpr, 0)
     } 
       
     // macro expansion

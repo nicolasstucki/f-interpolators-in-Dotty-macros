@@ -44,7 +44,7 @@ object Test extends App {
 
   // f2"$s%i"  
 
-  // 3) flag mismatches
+  // 3) flag mismatches 
   // f2"$s%+ 0,(s"  
   // f2"$c%#+ 0,(c"
   // f2"$d%#d"
@@ -66,15 +66,16 @@ object Test extends App {
   // f2"%<c"
   // f2"%<tT"
   // f2"%1$$n" 
-  // f2"${8}%d ${9}%d%3$$d" //TODO
-  // f2"${8}%d ${9}%d%0$$d" //TODO
+  // f2"${8}%d ${9}%d %3$$d"  
+  
+  // f2"${8}%d ${9}%d%0$$d"
 
-  // // warnings 
+  // warnings 
   // f2"${8}%d ${9}%1$$d"
-  // f2"$s%s $s%s %1$$<s" //TODO
+  // f2"$s%s $s%s %1$$<s"
   // f2"$s%s $s%1$$s"
 
-  // 6) bad arg types //TODO next time
+  // 6) bad arg types 
   // f2"$s%#s"
 
   // 7) misunderstood conversions 
@@ -83,5 +84,5 @@ object Test extends App {
   // f2"$s%10.5"
 
   // 8) other brain failures //TODO next time
-  // f2"${d}random-leading-junk%d"
+  // f2"${d}random-leading-junk%d" //TODO : look for %, if shit inside, return error part[1] = random-leading-junk%d
 }
