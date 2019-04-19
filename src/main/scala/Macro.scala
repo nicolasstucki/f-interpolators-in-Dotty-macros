@@ -2,7 +2,7 @@ import scala.quoted._
 import scala.tasty.Reflection
 import scala.language.implicitConversions
 import scala.quoted.Exprs.LiftedExpr
-import scala.quoted.Toolbox.Default._
+import reflect._
 
 object Macro {
   implicit inline def (strCtx: => StringContext) f2(args: =>Any*): String = ${FIntepolator('strCtx, 'args)}
@@ -19,17 +19,11 @@ object FIntepolator extends MacroStringInterpolator[String] {
   protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
     import reflect._
     strCtxExpr.unseal.underlyingArgument match {
-      case Term.Apply(Term.Select(Term.Select(_, "StringContext"), "apply"),
-        List(Term.Typed(Term.Repeated(strCtxArgTrees, _), _))) =>
-        strCtxArgTrees.map(_.seal[String])
-      case Term.Apply(Term.Select(Term.New(TypeTree.Ident("StringContext")), "<init>"), 
-        List(Term.Typed(Term.Repeated(strCtxArgTrees, _), _))) => 
-        strCtxArgTrees.map(_.seal[String])
-      case Term.Apply(Term.Select(Term.Ident("StringContext"), "apply"), 
-        List(Term.Typed(Term.Repeated(strCtxArgTrees, _), _))) => 
-        strCtxArgTrees.map(_.seal[String])
+      case reflect.Term.Apply(reflect.Term.Select(Term.Ident("StringContext"), "apply"), 
+        List(reflect.Term.Typed(reflect.Term.Repeated(strCtxArgTrees, _), _))) => 
+        strCtxArgTrees.map(_.seal.cast[String])
       case tree =>
-        throw new NotStaticlyKnownError("Expected statically known StringContext " + tree.show, tree.seal[Any])
+        throw new NotStaticlyKnownError("Expected statically known StringContext " + tree.showExtractors, tree.seal)
     }
   }
 
@@ -55,7 +49,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
     import reflect._
     stringExpr.unseal match {
       case Term.Literal(Constant.String(str)) => str
-      case tree =>  throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal[Any])
+      case tree =>  throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal)
     }
   }
 
@@ -245,7 +239,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
             case 'c' | 'C' => {
               if (!checkSubtype(arg.tpe, definitions.CharType, definitions.ByteType, definitions.ShortType, definitions.IntType))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Char\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Char\n", argPosition)
               for{flag <- flags ; if (flag != '-')} error("Only '-' allowed for c conversion", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
               if(precision) error("precision not allowed", partPosition.sourceFile, partPosition.start + precisionIndex, partPosition.start + precisionIndex)
             }
@@ -254,7 +248,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
             case 'd' => {
               if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger]))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Int\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Int\n", argPosition)
               for{flag <- flags} flag match {
                 case '#' => error("# not allowed for d conversion", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
                 case _ => //OK
@@ -264,7 +258,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
             case 'o' | 'x' | 'X' => {
               if (!checkSubtype(arg.tpe, definitions.IntType, definitions.LongType, definitions.ShortType, definitions.ByteType, typeOf[java.math.BigInteger]))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Int\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Int\n", argPosition)
               for{flag <- flags} flag match {
                 case '+' | ' ' | '(' if(!checkSubtype(arg.tpe, typeOf[java.math.BigInteger])) => error("Only use '" + flag + "' for BigInt conversions to o, x, X", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
                 case ',' => error("',' only allowed for d conversion of integral types", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
@@ -277,10 +271,10 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
             case 'e' | 'E' |'f' | 'g' | 'G' =>
               if (!checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, typeOf[java.math.BigDecimal]))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Double\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Double\n", argPosition)
             case 'a' | 'A' => {
               if (!checkSubtype(arg.tpe, definitions.DoubleType, definitions.FloatType, typeOf[java.math.BigDecimal]))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Double\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Double\n", argPosition)
               for{flag <- flags ; if (flag == ',' || flag == '(')} error("'" + flag + "' not allowed for a, A", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
               if(precision) error("precision not allowed", partPosition.sourceFile, partPosition.start + precisionIndex, partPosition.start + precisionIndex)
             }
@@ -289,7 +283,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
             case 't' | 'T' => {
               if (!checkSubtype(arg.tpe, definitions.LongType, typeOf[java.util.Calendar], typeOf[java.util.Date]))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Date\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Date\n", argPosition)
               for{flag <- flags ; if flag != '-'} error("Only '-' allowed for date/time conversions", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
               if(precision) error("precision not allowed", partPosition.sourceFile, partPosition.start + precisionIndex, partPosition.start + precisionIndex)
               if(i == part.size - 1) error("Date/time conversion must have two characters", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
@@ -302,14 +296,14 @@ object FIntepolator extends MacroStringInterpolator[String] {
 
             case 'b' | 'B' => {
               if (!checkSubtype(arg.tpe, definitions.BooleanType, definitions.NullType))
-                error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : Boolean\n", argPosition)
+                error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : Boolean\n", argPosition)
               for{flag <- flags ; if (flag != '-')} error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
             }
             case 'h' | 'H' => 
               for{flag <- flags ; if (flag != '-')} error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
             case 's' | 'S' => 
               for{flag <- flags ; if (flag != '-')} {
-                if(flag == '#' && !checkSubtype(typeOf[java.util.Formattable])) error("type mismatch;\n found : " + arg.tpe.showCode + "\nrequired : java.util.Formattable\n", argPosition)
+                if(flag == '#' && !checkSubtype(typeOf[java.util.Formattable])) error("type mismatch;\n found : " + arg.tpe.show + "\nrequired : java.util.Formattable\n", argPosition)
                 else error("Illegal flag : '" + flag + "'", partPosition.sourceFile, partPosition.start + i, partPosition.start + i)
               }
             case 'n' if(width) => error("width not allowed", partPosition.sourceFile, partPosition.start + widthIndex, partPosition.start + widthIndex)
