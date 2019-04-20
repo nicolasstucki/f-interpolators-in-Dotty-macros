@@ -30,10 +30,11 @@ abstract class MacroStringInterpolator[T] {
    */
   protected def getArgsList(argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): List[Expr[Any]] = {
     import reflect._ 
-    // TODO : use this for the position of the argument 
     argsExpr.unseal.underlyingArgument match {
-      case Term.Typed(Term.Repeated(args, _), _) => args.map(_.seal)
-      case tree => throw new NotStaticlyKnownError("Expected statically known argument list", tree.seal)
+      case '{${Repeated(args)}} => 
+        args.map(_.seal)
+      case _ => 
+        List('{ "ERROR" })
     }
   }
 

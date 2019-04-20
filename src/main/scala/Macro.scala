@@ -9,23 +9,6 @@ object Macro {
 }
 
 object FIntepolator extends MacroStringInterpolator[String] {
-  /**
-   * Transforms a given expression containing a StringContext into a list of expressions containing strings
-   * @param strCtxExpr the given expression to convert
-   * @throws NotNotStaticlyKnownError if the StringContext contained inside the given expression does not contain only
-   * String literals
-   * @return a list of expr of string corresponding to the parts of the given StringContext
-   */
-  protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
-    import reflect._
-    strCtxExpr.unseal.underlyingArgument match {
-      case reflect.Term.Apply(reflect.Term.Select(Term.Ident("StringContext"), "apply"), 
-        List(reflect.Term.Typed(reflect.Term.Repeated(strCtxArgTrees, _), _))) => 
-        strCtxArgTrees.map(_.seal.cast[String])
-      case tree =>
-        throw new NotStaticlyKnownError("Expected statically known StringContext " + tree.showExtractors, tree.seal)
-    }
-  }
 
   /**
    * Computes the StringContext from a given list of expr containing strings
@@ -35,22 +18,25 @@ object FIntepolator extends MacroStringInterpolator[String] {
    */
   protected def getStringContext(listExprStr : List[Expr[String]])(implicit reflect: Reflection) : StringContext = {
     import reflect._
-    val strings = listExprStr.map(stringExprToString)
+    val strings = listExprStr.map{case Literal(str : String) => str}
     new StringContext(strings : _*)
   }
 
   /**
-   * Computes the String from a given expr containing a string
-   * @param stringExpr the given expr of string
-   * @return the String contained in the given expr
-   * @throws NotStaticlyKnownError if the given expr does not contain a string literal
-   */
-  protected def stringExprToString(stringExpr : Expr[String])(implicit reflect : Reflection) : String = {
+    * Transforms a given expression containing a StringContext into a list of expressions containing strings
+    * @param strCtxExpr the given expression to convert
+    * @throws NotNotStaticlyKnownError if the StringContext contained inside the given expression does not contain only
+    * String literals
+    * @return a list of expr of string corresponding to the parts of the given StringContext
+    */
+  protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
     import reflect._
-    stringExpr.unseal match {
-      case Term.Literal(Constant.String(str)) => str
-      case tree =>  throw new NotStaticlyKnownError("Expected statically known StringContext", tree.seal)
-    }
+    strCtxExpr match {
+      case '{ StringContext(${Repeated(parts)}: _*) } => 
+        parts.map{case Literal(str : String) => str.seal.cast[String]}
+      case _ =>
+        List('{ "ERROR" })
+    } 
   }
 
   override protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[String] = {
@@ -62,7 +48,7 @@ object FIntepolator extends MacroStringInterpolator[String] {
       * @return a new list of string with all a defined formatting 
       */
     def addDefaultFormat(partsExpr : List[Expr[String]]) : List[String] = {
-       val parts : List[String] = partsExpr.map(stringExprToString)
+       val parts : List[String] = partsExpr.map{case Literal(str : String) => str}
        parts match {
         case Nil => Nil
         case p :: parts1 => p :: parts1.zip(partsExpr.tail).map((part : String, partExpr : Expr[String]) => {
