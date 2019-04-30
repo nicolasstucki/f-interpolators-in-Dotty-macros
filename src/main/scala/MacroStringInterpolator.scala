@@ -1,4 +1,5 @@
 import scala.quoted._
+import scala.quoted.matching._
 import scala.tasty.Reflection
 import scala.language.implicitConversions
 import scala.quoted.Exprs.LiftedExpr
@@ -9,7 +10,7 @@ abstract class MacroStringInterpolator[T] {
     try interpolate(strCtxExpr, argsExpr)
     catch {
       case ex: NotStaticlyKnownError =>
-        throw new QuoteError(ex.getMessage)
+        QuoteError(ex.getMessage)
     }
   }
 
@@ -29,10 +30,9 @@ abstract class MacroStringInterpolator[T] {
    * @throws NotStaticlyKnownError if the elements of the list are trees
    */
   protected def getArgsList(argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): List[Expr[Any]] = {
-    import reflect._ 
-    argsExpr.unseal.underlyingArgument match {
-      case '{${Repeated(args)}} => 
-        args.map(_.seal)
+    argsExpr match {
+      case Repeated(args) =>
+        args.toList
       case _ => 
         List('{ "ERROR" })
     }

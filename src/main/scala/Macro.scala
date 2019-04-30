@@ -1,4 +1,5 @@
 import scala.quoted._
+import scala.quoted.matching._
 import scala.tasty.Reflection
 import scala.language.implicitConversions
 import scala.quoted.Exprs.LiftedExpr
@@ -30,17 +31,16 @@ object FIntepolator extends MacroStringInterpolator[String] {
     * @return a list of expr of string corresponding to the parts of the given StringContext
     */
   protected def getListOfExpr(strCtxExpr : Expr[StringContext])(implicit reflect: Reflection): List[Expr[String]] = {
-    import reflect._
     strCtxExpr match {
       case '{ StringContext(${Repeated(parts)}: _*) } => 
-        parts.map{case Literal(str : String) => str.seal.cast[String]}
+        parts.toList //.map {case str @ Literal(_) => str }
       case _ =>
         List('{ "ERROR" })
     } 
   }
 
   override protected def interpolate(strCtxExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(implicit reflect: Reflection): Expr[String] = {
-    import reflect._
+    import reflect.{Literal => LiteralTree, _}
 
     /**
       * Adds the default "%s" to the strings that do not have any given format
